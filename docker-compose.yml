@@ -1,0 +1,8 @@
+services:
+  epoch-roll:
+    build: .
+    container_name: solana-epoch-roll
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+
