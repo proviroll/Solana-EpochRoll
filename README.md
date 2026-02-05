@@ -1,35 +1,83 @@
-# Solana-EpochRoll (Rust)
+# 🛡️ Solana-EpochRoll (v0.1.0)
 
-**Solana-EpochRoll** is a high-performance compliance monitor designed to ensure your validator remains aligned with SFDP version requirements. Rewritten in Rust for maximum reliability and minimal footprint, it provides real-time Slack alerts and heartbeat reporting for both Agave and Firedancer nodes.
+**Solana-EpochRoll** is a professional-grade, lightweight monitoring service written in Rust, specifically engineered for Solana validators. It ensures absolute compliance with the Solana Foundation Delegation Program (SFDP) while providing high-precision transition metrics.
 
-## ⚡ Why Rust?
-- **Zero-cost abstractions:** Highly efficient monitoring with negligible CPU/Memory impact.
-- **Async Reliability:** Built on `tokio` for robust network operations.
-- **Type Safety:** Ensures exact handling of network and version data.
+---
 
-## 🚀 Quick Start (Docker)
+## 🚀 Overview
 
-### 1. Setup
+In the fast-paced Solana ecosystem, maintaining version compliance and predicting epoch transitions accurately is critical for validator health and reward eligibility. **Solana-EpochRoll** automates this by bridging the gap between on-chain reality and operational awareness.
+
+The service performs real-time analysis of the cluster state, calculating epoch progression not just by slot count, but by true network velocity.
+
+## ✨ Key Features
+
+### 1. High-Precision Velocity Engine
+Unlike static counters, our engine uses a **Hybrid Weighted Velocity** method:
+*   **Momentum (80%)**: Analyzes the last 2000 slots (~15 mins) to capture immediate network fluctuations.
+*   **Baseline (20%)**: Anchors to the overall epoch average to ensure long-term stability.
+*   **Result**: Precise ETAs that match the behavior of major block explorers.
+
+### 2. Autonomous Discovery
+Designed for "zero-config" deployment. The monitor automatically queries the connected RPC to detect:
+*   **Validator Identity**: Resolves the node's unique public key.
+*   **Vote Account**: Dynamically finds the associated vote account for balance tracking.
+*   **Cluster Drift**: Detects the lag between the Network Cluster Clock and real-world UTC, automatically correcting ETAs to match on-chain time.
+
+### 3. Compliance & SFDP Tracking
+Proactively polls the Solana Foundation API to compare your node's current version against the mandatory minimums for upcoming epochs, flagging potential non-compliance before it impacts your delegation.
+
+### 4. Enterprise Slack Reporting
+Delivers beautiful, data-rich reports to your Slack workspace, including:
+*   **Health Status**: Real-time sync monitoring (slots behind detection).
+*   **Account Balances**: Live tracking of Identity and Vote account SOL balances.
+*   **Compliance Table**: A clear roadmap of upcoming version requirements.
+
+---
+
+## 🛠️ Technical Stack
+
+*   **Language**: Rust (2021 Edition) for memory safety and performance.
+*   **Async Runtime**: [Tokio](https://tokio.rs/) for efficient concurrent network I/O.
+*   **Networking**: [Reqwest](https://docs.rs/reqwest/) with 10s safety timeouts.
+*   **Serialization**: [Serde](https://serde.rs/) for robust JSON-RPC handling.
+
+---
+
+## 📦 Deployment
+
+### Prerequisites
+*   Docker & Docker Compose
+*   Access to a Solana RPC (Local or Remote)
+*   A Slack Webhook URL
+
+### Quick Start
+1.  Configure your `.env` file (see `.env.example`).
+2.  Launch the container:
 ```bash
-cp .env.example .env
-# Edit .env with your Slack Webhook and Mode
+docker compose up -d
 ```
 
-### 2. Deploy
-```bash
-docker-compose up -d
-```
-
-## ⚙️ Configuration (`.env`)
-
+### Environment Configuration
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `VALIDATOR_MODE` | `agave` or `firedancer` | `firedancer` |
-| `RPC_TYPE` | `local` or `remote` | `remote` |
-| `RPC_URL` | Solana RPC endpoint | `https://api.testnet.solana.com` |
-| `SLACK_WEBHOOK_URL` | Incoming Webhook URL | `REQUIRED` |
-| `VALIDATOR_IDENTITY` | Validator Pubkey | `Unknown` |
-| `REPORT_INTERVAL_HOURS`| Heartbeat frequency | `8` |
+| `VALIDATOR_MODE` | `firedancer` or `agave` | `firedancer` |
+| `RPC_URL` | Local or Remote Solana RPC URL | `http://localhost:8899` |
+| `CHECK_INTERVAL_SECONDS` | How often to poll the network | `1800` |
+| `SLACK_WEBHOOK_URL` | Your Slack integration URL | (Required) |
 
-## 📄 License
-MIT License - Open Source by ProviRoll.
+---
+
+## 🛡️ Security
+*   **Zero-Trust Identity**: No private keys are ever handled or required.
+*   **Containerized**: Fully isolated runtime environment.
+*   **Protocol-Native**: Communicates strictly via standard JSON-RPC over HTTPS.
+
+---
+
+## 📜 License
+This project is open-source and available under the **MIT License**. See the [LICENSE](LICENSE) file for more details.
+
+---
+
+**Developed by ProviRoll for the Solana Validator Community.**
