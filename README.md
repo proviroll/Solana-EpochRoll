@@ -1,4 +1,6 @@
-# 🛡️ Solana-EpochRoll (v0.1.0)
+# 🛡️ Solana-EpochRoll
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Solana-EpochRoll** is a professional-grade, lightweight monitoring service written in Rust, specifically engineered for Solana validators. It ensures absolute compliance with the Solana Foundation Delegation Program (SFDP) while providing high-precision transition metrics.
 
@@ -52,19 +54,19 @@ Delivers beautiful, data-rich reports to your Slack workspace, including:
 *   A Slack Webhook URL
 
 ### Quick Start
-1.  Configure your `.env` file (see `.env.example`).
+1.  Configure your `config.toml` file (see `config.toml.example`).
 2.  Launch the container:
 ```bash
 docker compose up -d
 ```
 
-### Environment Configuration
-| Variable | Description | Default |
+### Configuration (`config.toml`)
+| Key | Description | Default |
 | :--- | :--- | :--- |
-| `VALIDATOR_MODE` | `firedancer` or `agave` | `firedancer` |
-| `RPC_URL` | Local or Remote Solana RPC URL | `http://localhost:8899` |
-| `CHECK_INTERVAL_SECONDS` | How often to poll the network | `1800` |
-| `SLACK_WEBHOOK_URL` | Your Slack integration URL | (Required) |
+| `validator_mode` | `firedancer` or `agave` | `firedancer` |
+| `rpc_url` | Local or Remote Solana RPC URL | `http://localhost:8899` |
+| `check_interval_seconds` | How often to poll the network | `1800` |
+| `slack_webhook_url` | Your Slack integration URL | (Required) |
 
 ---
 

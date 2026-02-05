@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/
 
 # Copy binary from builder
 COPY --from=builder /usr/src/app/target/release/solana-epoch-roll-rs /usr/local/bin/solana-epoch-roll
+COPY config.toml /app/config.toml
 
 # Run the monitor
 CMD ["solana-epoch-roll"]

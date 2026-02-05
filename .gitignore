@@ -12,6 +12,7 @@
 .env
 .env.*
 !.env.example
+config.toml
 
 # IDE settings
 .vscode/

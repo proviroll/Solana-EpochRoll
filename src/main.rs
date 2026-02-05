@@ -5,7 +5,7 @@ mod service;
 use crate::client::SolanaClient;
 use crate::service::SFDPService;
 use anyhow::Result;
-use std::env;
+use config::Config;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, EnvFilter};
 
@@ -16,30 +16,31 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env().add_directive(tracing::Level::INFO.into()))
         .init();
 
-    // Load .env
-    dotenvy::dotenv().ok();
+    // Load Configuration
+    let settings = Config::builder()
+        .add_source(config::File::with_name("config.toml").required(true))
+        .add_source(config::Environment::with_prefix("APP"))
+        .build()?;
 
-    // Configuration
-    let mode = env::var("VALIDATOR_MODE")
+    let mode = settings
+        .get_string("validator_mode")
         .unwrap_or_else(|_| "firedancer".to_string())
         .into();
-    let rpc_type = env::var("RPC_TYPE")
+    let rpc_type = settings
+        .get_string("rpc_type")
         .unwrap_or_else(|_| "remote".to_string())
         .into();
-    let rpc_url =
-        env::var("RPC_URL").unwrap_or_else(|_| "https://api.testnet.solana.com".to_string());
-    let sfdp_url = env::var("SFDP_API_URL").unwrap_or_else(|_| {
-        "https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=testnet".to_string()
-    });
-    let slack_webhook = env::var("SLACK_WEBHOOK_URL")?;
-    let identity = env::var("VALIDATOR_IDENTITY").unwrap_or_else(|_| "Unknown".to_string());
-    let vote_account = env::var("VOTE_ACCOUNT").ok();
-    let check_secs = env::var("CHECK_INTERVAL_SECONDS")
-        .unwrap_or_else(|_| "1800".to_string())
-        .parse()?;
-    let report_hours = env::var("REPORT_INTERVAL_HOURS")
-        .unwrap_or_else(|_| "8".to_string())
-        .parse()?;
+    let rpc_url = settings
+        .get_string("rpc_url")
+        .unwrap_or_else(|_| "https://api.testnet.solana.com".to_string());
+    let sfdp_url = "https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=testnet"
+        .to_string();
+    let slack_webhook = settings.get_string("slack_webhook_url")?;
+    let identity = settings
+        .get_string("validator_identity")
+        .unwrap_or_else(|_| "Unknown".to_string());
+    let check_secs = settings.get_int("check_interval_seconds").unwrap_or(1800) as u64;
+    let report_hours = settings.get_int("report_interval_hours").unwrap_or(8);
 
     // Clients
     let client = SolanaClient::new(rpc_url, sfdp_url);
@@ -64,7 +65,7 @@ async fn main() -> Result<()> {
         rpc_type,
         slack_webhook,
         identity,
-        vote_account,
+        None, // Vote account auto-discovered
         check_secs,
         report_hours,
     );
