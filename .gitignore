@@ -8,10 +8,11 @@
 # External dependencies
 /node_modules/
 
-# Environment variables
+# Environment and Configuration
 .env
 .env.*
-!.env.example
+config.toml
+!config.toml.example
 config.toml
 
 # IDE settings

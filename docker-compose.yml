@@ -4,5 +4,6 @@ services:
     container_name: solana-epoch-roll
     restart: unless-stopped
     network_mode: host
-    env_file: .env
+    volumes:
+      - ./config.toml:/app/config.toml:ro
 

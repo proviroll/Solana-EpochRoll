@@ -1,0 +1,22 @@
+# Solana-EpochRoll Configuration Example
+
+# Validator Mode: "firedancer" or "agave"
+validator_mode = "firedancer"
+
+# RPC Type: "remote" or "local"
+rpc_type = "remote"
+
+# Solana RPC URL (e.g., http://localhost:8899 or a public endpoint)
+rpc_url = "https://api.testnet.solana.com"
+
+# Slack Integration Webhook URL
+slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/HERE"
+
+# Validator Identity: Use "Unknown" for auto-detection via RPC
+validator_identity = "Unknown"
+
+# Polling interval in seconds (e.g., 1800 = 30 minutes)
+check_interval_seconds = 1800
+
+# Forced report interval in hours (e.g., 8 = every 8 hours even if no version change)
+report_interval_hours = 8
