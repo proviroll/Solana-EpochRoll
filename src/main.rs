@@ -17,10 +17,17 @@ async fn main() -> Result<()> {
         .init();
 
     // Load Configuration
-    let settings = Config::builder()
+    let settings = match Config::builder()
         .add_source(config::File::with_name("config.toml").required(true))
         .add_source(config::Environment::with_prefix("APP"))
-        .build()?;
+        .build()
+    {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Configuration error: {}. Did you create 'config.toml' from 'config.toml.example'?", e);
+            std::process::exit(1);
+        }
+    };
 
     let mode = settings
         .get_string("validator_mode")
