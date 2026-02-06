@@ -1,5 +1,6 @@
 use crate::client::SolanaClient;
 use crate::models::*;
+use crate::utils::{format_duration, is_compliant};
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use std::time::Duration as StdDuration;
@@ -41,49 +42,6 @@ impl SFDPService {
             report_interval: Duration::hours(report_hours),
             last_requirement_hash: 0,
             last_report_time: Utc::now() - Duration::hours(24),
-        }
-    }
-
-    fn is_compliant(&self, current: &str, required: &str) -> bool {
-        let clean_curr = current
-            .trim_start_matches('v')
-            .split('-')
-            .next()
-            .unwrap_or("");
-        let clean_req = required
-            .trim_start_matches('v')
-            .split('-')
-            .next()
-            .unwrap_or("");
-
-        let curr_parts: Vec<u32> = clean_curr
-            .split('.')
-            .filter_map(|s| s.parse().ok())
-            .collect();
-        let req_parts: Vec<u32> = clean_req
-            .split('.')
-            .filter_map(|s| s.parse().ok())
-            .collect();
-
-        if curr_parts.is_empty() || req_parts.is_empty() {
-            return false;
-        }
-
-        // Compare major.minor.patch
-        curr_parts >= req_parts
-    }
-
-    fn format_duration(&self, seconds: i64) -> String {
-        let days = seconds / 86400;
-        let hours = (seconds % 86400) / 3600;
-        let mins = (seconds % 3600) / 60;
-        let secs = seconds % 60;
-        if days > 0 {
-            format!("{}d {}h {}m {}s", days, hours, mins, secs)
-        } else if hours > 0 {
-            format!("{}h {}m {}s", hours, mins, secs)
-        } else {
-            format!("{}m {}s", mins, secs)
         }
     }
 
@@ -133,13 +91,13 @@ impl SFDPService {
                 format!(
                     "\n🔄 *Catching Up:* `{}` slots remaining (~{})",
                     slots,
-                    self.format_duration(eta_secs)
+                    format_duration(eta_secs)
                 ),
             )
         } else {
             (
                 "error".to_string(),
-                format!("\n🔴 *RPC Connectivity Error:* `{}`", raw_health),
+                format!("\n🔴 *RPC Connectivity Error:* `{}`", raw_health)
             )
         };
 
@@ -208,7 +166,7 @@ impl SFDPService {
                 ValidatorMode::Agave => &req.agave_min_version,
                 ValidatorMode::Firedancer => &req.firedancer_min_version,
             };
-            let ok = self.is_compliant(current_ver, req_ver);
+            let ok = is_compliant(current_ver, req_ver);
             if req.epoch <= info.epoch && !ok {
                 overall_compliant = false;
             }
@@ -226,7 +184,6 @@ impl SFDPService {
                 let eta = now + Duration::seconds(seconds_rem);
 
                 if seconds_rem > 15_552_000 {
-                    // > 6 months
                     eta.format("%b %d, %Y").to_string()
                 } else {
                     eta.format("%b %d %H:%M").to_string()
@@ -301,7 +258,7 @@ impl SFDPService {
                         "type": "mrkdwn",
                         "text": format!("*Ends:* `{}` UTC (`{}` left)\n*Identity:* `{}`\n*Vote:* `{}`\n*RPC:* `{}`{}",
                             epoch_end_eta.format("%b %d %H:%M"),
-                            self.format_duration(time_left_seconds),
+                            format_duration(time_left_seconds),
                             self.identity,
                             vote_pubkey.unwrap_or_else(|| "Unknown".to_string()),
                             self.client.get_rpc_url(),
@@ -347,8 +304,9 @@ impl SFDPService {
         if is_change || force {
             info!("Syncing network state and transmitting report...");
 
-            // Auto-detect identity if configured as "Unknown" or not a valid pubkey length
-            if self.identity == "Unknown" || self.identity.is_empty() {
+            // Auto-detect identity if not explicitly provided
+            let id_lower = self.identity.to_lowercase();
+            if id_lower.is_empty() || id_lower == "auto" || id_lower == "unknown" {
                 if let Ok(id) = self.client.get_identity().await {
                     info!("Auto-detected node identity: {}", id);
                     self.identity = id;

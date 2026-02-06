@@ -12,8 +12,10 @@ rpc_url = "https://api.testnet.solana.com"
 # Slack Integration Webhook URL
 slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/HERE"
 
-# Validator Identity: Use "Unknown" for auto-detection via RPC
-validator_identity = "Unknown"
+# Validator Identity (Public Key)
+# Professional Practice: Provide your validator's public key here.
+# For zero-config local testing, you can leave this empty ("") to auto-detect via RPC.
+validator_identity = ""
 
 # Polling interval in seconds (e.g., 1800 = 30 minutes)
 check_interval_seconds = 1800

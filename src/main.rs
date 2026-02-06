@@ -1,6 +1,7 @@
 mod client;
 mod models;
 mod service;
+mod utils;
 
 use crate::client::SolanaClient;
 use crate::service::SFDPService;
@@ -45,7 +46,7 @@ async fn main() -> Result<()> {
     let slack_webhook = settings.get_string("slack_webhook_url")?;
     let identity = settings
         .get_string("validator_identity")
-        .unwrap_or_else(|_| "Unknown".to_string());
+        .unwrap_or_else(|_| "".to_string());
     let check_secs = settings.get_int("check_interval_seconds").unwrap_or(1800) as u64;
     let report_hours = settings.get_int("report_interval_hours").unwrap_or(8);
 

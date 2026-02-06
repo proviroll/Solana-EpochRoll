@@ -18,7 +18,7 @@ WORKDIR /app
 # Install runtime dependencies (OpenSSL)
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder
+# Copy binary and configuration
 COPY --from=builder /usr/src/app/target/release/solana-epoch-roll-rs /usr/local/bin/solana-epoch-roll
 COPY config.toml /app/config.toml
 
