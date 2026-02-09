@@ -1,4 +1,4 @@
-# 🛡️ Solana-EpochRoll (v0.1.0)
+# 🛡️ Solana-EpochRoll [![Version](https://img.shields.io/github/v/release/proviroll/Solana-EpochRoll?style=flat-square)](https://github.com/proviroll/Solana-EpochRoll/releases/latest)
 
 **Solana-EpochRoll** is a professional-grade, lightweight monitoring service written in Rust, specifically engineered for Solana validators. It ensures absolute compliance with the Solana Foundation Delegation Program (SFDP) while providing high-precision transition metrics.
 
