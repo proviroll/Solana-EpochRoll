@@ -53,6 +53,30 @@ pub struct RPCError {
     pub data: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReportData {
+    pub mode_str: String,
+    pub status_icon: String,
+    pub status_text: String,
+    pub compliance_text: String,
+    pub epoch: u64,
+    pub progress: f64,
+    pub processed_slot: u64,
+    pub slot_lag: u64,
+    pub identity_bal: String,
+    pub vote_bal: String,
+    pub eta_str: String,
+    pub time_left: String,
+    pub identity: String,
+    pub vote_pubkey: String,
+    pub rpc_url: String,
+    pub warning_text: String,
+    pub avg_slot_time: f64,
+    pub current_ver: String,
+    pub table: String,
+    pub drift_seconds: i64,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct VersionResult {
     #[serde(rename = "solana-core")]
