@@ -1,6 +1,4 @@
-# 🛡️ Solana-EpochRoll
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# 🛡️ Solana-EpochRoll (v0.1.0)
 
 **Solana-EpochRoll** is a professional-grade, lightweight monitoring service written in Rust, specifically engineered for Solana validators. It ensures absolute compliance with the Solana Foundation Delegation Program (SFDP) while providing high-precision transition metrics.
 
@@ -26,14 +24,14 @@ Designed for "zero-config" deployment. The monitor automatically queries the con
 *   **Vote Account**: Dynamically finds the associated vote account for balance tracking.
 *   **Cluster Drift**: Detects the lag between the Network Cluster Clock and real-world UTC, automatically correcting ETAs to match on-chain time.
 
-### 3. Compliance & SFDP Tracking
-Proactively polls the Solana Foundation API to compare your node's current version against the mandatory minimums for upcoming epochs, flagging potential non-compliance before it impacts your delegation.
+### 3. Multi-Channel Alerting
+Supports simultaneous reporting across enterprise communication platforms. Each provider can be individually enabled/disabled via `config.toml`:
+*   **Slack**: Rich Block Kit formatting with status icons.
+*   **Telegram**: Clean Markdown reports with instant mobile delivery.
+*   **Discord**: Professional Embed-based alerting with status-coded colors.
 
-### 4. Enterprise Slack Reporting
-Delivers beautiful, data-rich reports to your Slack workspace, including:
-*   **Health Status**: Real-time sync monitoring (slots behind detection).
-*   **Account Balances**: Live tracking of Identity and Vote account SOL balances.
-*   **Compliance Table**: A clear roadmap of upcoming version requirements.
+### 4. Compliance & SFDP Tracking
+Proactively polls the Solana Foundation API to compare your node's current version against the mandatory minimums for upcoming epochs, flagging potential non-compliance before it impacts your delegation.
 
 ---
 
@@ -51,22 +49,30 @@ Delivers beautiful, data-rich reports to your Slack workspace, including:
 ### Prerequisites
 *   Docker & Docker Compose
 *   Access to a Solana RPC (Local or Remote)
-*   A Slack Webhook URL
+*   At least one notification channel (Slack, Telegram, or Discord)
 
 ### Quick Start
-1.  Configure your `config.toml` file (see `config.toml.example`).
+1.  Configure your `config.toml` from the provided example.
 2.  Launch the container:
 ```bash
 docker compose up -d
 ```
 
-### Configuration (`config.toml`)
-| Key | Description | Default |
-| :--- | :--- | :--- |
-| `validator_mode` | `firedancer` or `agave` | `firedancer` |
-| `rpc_url` | Local or Remote Solana RPC URL | `http://localhost:8899` |
-| `check_interval_seconds` | How often to poll the network | `1800` |
-| `slack_webhook_url` | Your Slack integration URL | (Required) |
+### Configuration Example (`config.toml`)
+```toml
+[slack]
+enabled = true
+webhook_url = "https://hooks.slack.com/services/..."
+
+[telegram]
+enabled = true
+bot_token = "12345:ABCDE..."
+chat_id = "12345678"
+
+[discord]
+enabled = false
+webhook_url = ""
+```
 
 ---
 
