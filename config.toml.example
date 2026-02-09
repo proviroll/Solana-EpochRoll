@@ -1,24 +1,32 @@
-# Solana-EpochRoll Configuration Example
+# Solana-EpochRoll Configuration Template
 
-# Validator Mode: "firedancer" or "agave"
+# Mode: Tracking 'firedancer' or 'agave' requirements
 validator_mode = "firedancer"
 
-# RPC Type: "remote" or "local"
+# Connection: 'local' (validator node) or 'remote' (RPC service)
 rpc_type = "remote"
-
-# Solana RPC URL (e.g., http://localhost:8899 or a public endpoint)
 rpc_url = "https://api.testnet.solana.com"
 
-# Slack Integration Webhook URL
-slack_webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/HERE"
-
-# Validator Identity (Public Key)
-# Professional Practice: Provide your validator's public key here.
-# For zero-config local testing, you can leave this empty ("") to auto-detect via RPC.
+# Identity: Leave empty ("") for auto-detection on the validator node
 validator_identity = ""
 
-# Polling interval in seconds (e.g., 1800 = 30 minutes)
+# Timing: Poll every 30 minutes (1800 seconds)
 check_interval_seconds = 1800
 
-# Forced report interval in hours (e.g., 8 = every 8 hours even if no version change)
+# Heartbeat: Force a report every X hours (0 for every check)
 report_interval_hours = 8
+
+# --- Notifications ---
+
+[slack]
+enabled = false
+webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+[telegram]
+enabled = false
+bot_token = "YOUR_BOT_TOKEN"
+chat_id = "YOUR_CHAT_ID"
+
+[discord]
+enabled = false
+webhook_url = "https://discord.com/api/webhooks/YOUR/WEBHOOK/URL"
