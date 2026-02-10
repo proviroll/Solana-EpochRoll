@@ -4,6 +4,7 @@ mod service;
 mod utils;
 
 use crate::client::SolanaClient;
+use crate::service::notifications::*;
 use crate::service::SFDPService;
 use anyhow::Result;
 use config::Config;
@@ -25,7 +26,10 @@ async fn main() -> Result<()> {
     {
         Ok(s) => s,
         Err(e) => {
-            error!("Configuration error: {}. Did you create 'config.toml' from 'config.toml.example'?", e);
+            error!(
+                "Configuration error: {}. Did you create 'config.toml' from 'config.toml.example'?",
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -43,12 +47,52 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|_| "https://api.testnet.solana.com".to_string());
     let sfdp_url = "https://api.solana.org/api/community/v1/sfdp_required_versions?cluster=testnet"
         .to_string();
-    let slack_webhook = settings.get_string("slack_webhook_url")?;
     let identity = settings
         .get_string("validator_identity")
         .unwrap_or_else(|_| "".to_string());
     let check_secs = settings.get_int("check_interval_seconds").unwrap_or(1800) as u64;
     let report_hours = settings.get_int("report_interval_hours").unwrap_or(8);
+
+    // Notification Providers
+    let mut providers: Vec<Box<dyn NotificationProvider>> = Vec::new();
+
+    // Slack
+    if settings.get_bool("slack.enabled").unwrap_or(false) {
+        if let Ok(url) = settings.get_string("slack.webhook_url") {
+            if !url.is_empty() {
+                info!("Enabling Slack notifications");
+                providers.push(Box::new(SlackProvider::new(url)));
+            }
+        }
+    }
+
+    // Telegram
+    if settings.get_bool("telegram.enabled").unwrap_or(false) {
+        if let (Ok(token), Ok(chat_id)) = (
+            settings.get_string("telegram.bot_token"),
+            settings.get_string("telegram.chat_id"),
+        ) {
+            if !token.is_empty() && !chat_id.is_empty() {
+                info!("Enabling Telegram notifications");
+                providers.push(Box::new(TelegramProvider::new(token, chat_id)));
+            }
+        }
+    }
+
+    // Discord
+    if settings.get_bool("discord.enabled").unwrap_or(false) {
+        if let Ok(url) = settings.get_string("discord.webhook_url") {
+            if !url.is_empty() {
+                info!("Enabling Discord notifications");
+                providers.push(Box::new(DiscordProvider::new(url)));
+            }
+        }
+    }
+
+    if providers.is_empty() {
+        error!("CRITICAL: No notification providers configured (Slack, Telegram, or Discord)");
+        std::process::exit(1);
+    }
 
     // Clients
     let client = SolanaClient::new(rpc_url, sfdp_url);
@@ -71,11 +115,11 @@ async fn main() -> Result<()> {
         client,
         mode,
         rpc_type,
-        slack_webhook,
         identity,
         None, // Vote account auto-discovered
         check_secs,
         report_hours,
+        providers,
     );
 
     service.start().await

@@ -1,5 +1,8 @@
+pub mod notifications;
+
 use crate::client::SolanaClient;
 use crate::models::*;
+use crate::service::notifications::NotificationProvider;
 use crate::utils::{format_duration, is_compliant};
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
@@ -11,13 +14,13 @@ pub struct SFDPService {
     client: SolanaClient,
     mode: ValidatorMode,
     rpc_type: RPCType,
-    slack_webhook: String,
     identity: String,
     vote_account: Option<String>,
     check_interval: StdDuration,
     report_interval: Duration,
     last_requirement_hash: u64,
     last_report_time: DateTime<Utc>,
+    notification_providers: Vec<Box<dyn NotificationProvider>>,
 }
 
 impl SFDPService {
@@ -25,27 +28,27 @@ impl SFDPService {
         client: SolanaClient,
         mode: ValidatorMode,
         rpc_type: RPCType,
-        slack_webhook: String,
         identity: String,
         vote_account: Option<String>,
         check_secs: u64,
         report_hours: i64,
+        notification_providers: Vec<Box<dyn NotificationProvider>>,
     ) -> Self {
         Self {
             client,
             mode,
             rpc_type,
-            slack_webhook,
             identity,
             vote_account,
             check_interval: StdDuration::from_secs(check_secs),
             report_interval: Duration::hours(report_hours),
             last_requirement_hash: 0,
             last_report_time: Utc::now() - Duration::hours(24),
+            notification_providers,
         }
     }
 
-    async fn send_slack(
+    async fn broadcast_report(
         &self,
         current_ver: &str,
         info: &EpochInfo,
@@ -97,7 +100,7 @@ impl SFDPService {
         } else {
             (
                 "error".to_string(),
-                format!("\n🔴 *RPC Connectivity Error:* `{}`", raw_health)
+                format!("\n🔴 *RPC Connectivity Error:* `{}`", raw_health),
             )
         };
 
@@ -118,6 +121,7 @@ impl SFDPService {
             .as_ref()
             .map(|v| v.vote_pubkey.clone())
             .or(self.vote_account.clone());
+        let vote_pubkey_str = vote_pubkey.clone().unwrap_or_else(|| "Unknown".to_string());
 
         let vote_bal_str = if let Some(ref v) = vote_pubkey {
             match self.client.get_balance(v).await {
@@ -137,12 +141,11 @@ impl SFDPService {
             .await
             .unwrap_or(now.timestamp());
         let drift_seconds = now.timestamp() - cluster_time;
-        info!("Network Clock Drift detected: {}s", drift_seconds);
 
         let slots_left_current = info.slots_in_epoch - info.slot_index;
         let time_left_seconds = (slots_left_current as f64 * avg_slot_time) as i64;
 
-        // Correct ETA by subtracting the cluster drift
+        // Correct ETA
         let epoch_end_eta = now + Duration::seconds(time_left_seconds - drift_seconds);
 
         let mode_str = match self.mode {
@@ -150,7 +153,6 @@ impl SFDPService {
             ValidatorMode::Firedancer => "FIREDANCER",
         };
 
-        info!("Building Slack payload...");
         let mut table = format!(
             "{:<6} | {:<14} | {:<14} | Status\n",
             "Epoch",
@@ -222,7 +224,6 @@ impl SFDPService {
             "NON-COMPLIANT"
         };
 
-        // Cluster Mismatch Warning
         let mut warning_text = sync_text;
         if !requirements.is_empty()
             && (info.epoch as i64 - requirements[0].epoch as i64).abs() > 100
@@ -232,65 +233,35 @@ impl SFDPService {
             );
         }
 
-        let payload = serde_json::json!({
-            "text": format!("Solana-EpochRoll [{}]: {}", mode_str, status_text),
-            "blocks": [
-                {
-                    "type": "header",
-                    "text": {"type": "plain_text", "text": format!("🛡️ Solana Testnet Validator Status [{}]", mode_str)}
-                },
-                {
-                    "type": "section",
-                    "fields": [
-                        { "type": "mrkdwn", "text": format!("*Status:* {} `{}`", status_icon, status_text) },
-                        { "type": "mrkdwn", "text": format!("*Compliance:* `{}`", compliance_text) },
-                        { "type": "mrkdwn", "text": format!("*Processed Slot:* `{}`", processed_slot) },
-                        { "type": "mrkdwn", "text": format!("*Slot Lag:* `{}`", slot_lag) },
-                        { "type": "mrkdwn", "text": format!("*Epoch:* `{}`", info.epoch) },
-                        { "type": "mrkdwn", "text": format!("*Progress:* `{:.2}%`", progress) },
-                        { "type": "mrkdwn", "text": format!("*Identity Bal:* `{}`", identity_bal_str) },
-                        { "type": "mrkdwn", "text": format!("*Vote Bal:* `{}`", vote_bal_str) }
-                    ]
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": format!("*Ends:* `{}` UTC (`{}` left)\n*Identity:* `{}`\n*Vote:* `{}`\n*RPC:* `{}`{}",
-                            epoch_end_eta.format("%b %d %H:%M"),
-                            format_duration(time_left_seconds),
-                            self.identity,
-                            vote_pubkey.unwrap_or_else(|| "Unknown".to_string()),
-                            self.client.get_rpc_url(),
-                            warning_text)
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "section",
-                    "text": {"type": "mrkdwn", "text": format!("```\n{}```", table)}
-                },
-                {
-                    "type": "context",
-                    "elements": [{"type": "mrkdwn", "text": format!("Method: Hybrid + Clock Sync | Velocity: {:.4}s/slot | Drift: {}s", avg_slot_time, drift_seconds)}]
-                }
-            ]
-        });
+        let report_data = ReportData {
+            mode_str: mode_str.to_string(),
+            status_icon: status_icon.to_string(),
+            status_text: status_text.to_string(),
+            compliance_text: compliance_text.to_string(),
+            epoch: info.epoch,
+            progress,
+            processed_slot,
+            slot_lag,
+            identity_bal: identity_bal_str,
+            vote_bal: vote_bal_str,
+            eta_str: epoch_end_eta.format("%b %d %H:%M").to_string(),
+            time_left: format_duration(time_left_seconds),
+            identity: self.identity.clone(),
+            vote_pubkey: vote_pubkey_str,
+            rpc_url: self.client.get_rpc_url().to_string(),
+            warning_text,
+            avg_slot_time,
+            current_ver: current_ver.to_string(),
+            drift_seconds,
+            table,
+        };
 
-        info!("Sending request to Slack webhook...");
-        let slack_client = reqwest::Client::builder()
-            .timeout(StdDuration::from_secs(10))
-            .build()?;
+        for provider in &self.notification_providers {
+            if let Err(e) = provider.notify(&report_data).await {
+                error!("Notification failure: {}", e);
+            }
+        }
 
-        let resp = slack_client
-            .post(&self.slack_webhook)
-            .json(&payload)
-            .send()
-            .await?;
-
-        info!("Slack response: {}", resp.status());
         Ok(())
     }
 
@@ -323,8 +294,8 @@ impl SFDPService {
             info!("Fetching epoch info...");
             let info = self.client.fetch_epoch_info().await?;
 
-            info!("Transmitting to Slack...");
-            self.send_slack(&version, &info, &data).await?;
+            info!("Transmitting broadcast report...");
+            self.broadcast_report(&version, &info, &data).await?;
 
             self.last_requirement_hash = current_hash;
             self.last_report_time = Utc::now();
