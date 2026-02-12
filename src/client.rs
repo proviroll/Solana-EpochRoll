@@ -183,19 +183,6 @@ impl SolanaClient {
         Ok(None)
     }
 
-    pub async fn get_cluster_time(&self) -> Result<i64> {
-        let resp = self.http_client.post(&self.rpc_url)
-            .json(&serde_json::json!({"jsonrpc":"2.0","id":1, "method":"getBlockTime", "params": [self.get_slot("processed").await?]}))
-            .send()
-            .await?
-            .json::<RPCResponse<Option<i64>>>()
-            .await?;
-
-        resp.result
-            .flatten()
-            .ok_or_else(|| anyhow!("Could not fetch cluster time"))
-    }
-
     pub async fn get_slot(&self, commitment: &str) -> Result<u64> {
         let resp = self
             .http_client
@@ -252,5 +239,63 @@ impl SolanaClient {
         resp.result
             .map(|r| r.solana_core)
             .ok_or_else(|| anyhow!("No result in getVersion response"))
+    }
+
+    pub async fn get_leader_schedule(&self, identity: &str) -> Result<Vec<u64>> {
+        let resp = self
+            .http_client
+            .post(&self.rpc_url)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0", "id": 1,
+                "method": "getLeaderSchedule",
+                "params": [serde_json::Value::Null, {"identity": identity}]
+            }))
+            .send()
+            .await?
+            .json::<RPCResponse<serde_json::Value>>()
+            .await?;
+
+        if let Some(error) = resp.error {
+            return Err(anyhow!("RPC Error (getLeaderSchedule): {}", error.message));
+        }
+
+        let schedule = resp
+            .result
+            .and_then(|r| r.get(identity).cloned())
+            .and_then(|v| serde_json::from_value::<Vec<u64>>(v).ok())
+            .unwrap_or_default();
+
+        Ok(schedule)
+    }
+
+    pub async fn get_validator_version(&self, identity: &str) -> Result<String> {
+        let resp = self
+            .http_client
+            .post(&self.rpc_url)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0", "id": 1,
+                "method": "getClusterNodes"
+            }))
+            .send()
+            .await?
+            .json::<RPCResponse<Vec<serde_json::Value>>>()
+            .await?;
+
+        if let Some(error) = resp.error {
+            return Err(anyhow!("RPC Error (getClusterNodes): {}", error.message));
+        }
+
+        let nodes = resp.result.unwrap_or_default();
+        for node in nodes {
+            if node.get("pubkey").and_then(|v| v.as_str()) == Some(identity) {
+                return node
+                    .get("version")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| anyhow!("No version field for node"));
+            }
+        }
+
+        Err(anyhow!("Validator identity not found in cluster nodes"))
     }
 }

@@ -1,6 +1,6 @@
+use crate::models::ReportData;
 use anyhow::Result;
 use async_trait::async_trait;
-use crate::models::ReportData;
 use reqwest::Client;
 use serde_json::json;
 
@@ -49,8 +49,8 @@ impl NotificationProvider for SlackProvider {
                 {
                     "type": "section",
                     "text": {
-                        "type": "mrkdwn", 
-                        "text": format!("*Ends:* `{}` UTC (`{}` left)\n*Identity:* `{}`\n*Vote:* `{}`\n*RPC:* `{}`{}", 
+                        "type": "mrkdwn",
+                        "text": format!("*Ends:* `{}` UTC (`{}` left)\n*Identity:* `{}`\n*Vote:* `{}`\n*RPC:* `{}`{}",
                             data.eta_str,
                             data.time_left,
                             data.identity,
@@ -67,13 +67,21 @@ impl NotificationProvider for SlackProvider {
                     "text": {"type": "mrkdwn", "text": format!("```\n{}```", data.table)}
                 },
                 {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": data.maintenance_msg.clone().unwrap_or_else(|| "_System compliant. No pending upgrades._".to_string())}
+                },
+                {
                     "type": "context",
-                    "elements": [{"type": "mrkdwn", "text": format!("Method: Hybrid + Clock Sync | Velocity: {:.4}s/slot | Drift: {}s | Detected: {}", data.avg_slot_time, data.drift_seconds, data.current_ver)}]
+                    "elements": [{"type": "mrkdwn", "text": format!("Method: Hybrid | Velocity: {:.4}s/slot | Detected: {}", data.avg_slot_time, data.current_ver)}]
                 }
             ]
         });
 
-        self.client.post(&self.webhook_url).json(&payload).send().await?;
+        self.client
+            .post(&self.webhook_url)
+            .json(&payload)
+            .send()
+            .await?;
         tracing::info!("Slack notification sent successfully");
         Ok(())
     }
@@ -114,16 +122,35 @@ impl NotificationProvider for TelegramProvider {
             *RPC:* `{}`\n\
             {}\n\n\
             ```\n{}```\n\
-            _Method: Hybrid + Clock Sync | Velocity: {:.4}s/slot | Drift: {}s | Detected: {}_",
-            data.mode_str, data.status_icon, data.status_text, data.compliance_text, 
-            data.processed_slot, data.slot_lag, data.epoch, data.progress, 
-            data.identity_bal, data.vote_bal, data.eta_str, data.time_left, 
-            data.identity, data.vote_pubkey, data.rpc_url, data.warning_text,
-            data.table, data.avg_slot_time, data.drift_seconds, data.current_ver
+            {}\n\n\
+            _Method: Hybrid | Velocity: {:.4}s/slot | Detected: {}_",
+            data.mode_str,
+            data.status_icon,
+            data.status_text,
+            data.compliance_text,
+            data.processed_slot,
+            data.slot_lag,
+            data.epoch,
+            data.progress,
+            data.identity_bal,
+            data.vote_bal,
+            data.eta_str,
+            data.time_left,
+            data.identity,
+            data.vote_pubkey,
+            data.rpc_url,
+            data.warning_text,
+            data.table,
+            data.maintenance_msg
+                .clone()
+                .unwrap_or_else(|| "_System compliant._".to_string()),
+            data.avg_slot_time,
+            data.current_ver
         );
 
         let url = format!("https://api.telegram.org/bot{}/sendMessage", self.bot_token);
-        self.client.post(&url)
+        self.client
+            .post(&url)
             .json(&json!({
                 "chat_id": self.chat_id,
                 "text": text,
@@ -167,10 +194,21 @@ impl NotificationProvider for DiscordProvider {
             **Vote:** `{}`\n\
             **RPC:** `{}`\n\
             {}",
-            data.status_icon, data.status_text, data.compliance_text, 
-            data.processed_slot, data.slot_lag, data.epoch, data.progress, 
-            data.identity_bal, data.vote_bal, data.eta_str, data.time_left, 
-            data.identity, data.vote_pubkey, data.rpc_url, data.warning_text
+            data.status_icon,
+            data.status_text,
+            data.compliance_text,
+            data.processed_slot,
+            data.slot_lag,
+            data.epoch,
+            data.progress,
+            data.identity_bal,
+            data.vote_bal,
+            data.eta_str,
+            data.time_left,
+            data.identity,
+            data.vote_pubkey,
+            data.rpc_url,
+            data.warning_text
         );
 
         let payload = json!({
@@ -183,15 +221,23 @@ impl NotificationProvider for DiscordProvider {
                     {
                         "name": "Compliance Table",
                         "value": format!("```\n{}```", data.table)
+                    },
+                    {
+                        "name": "Maintenance Advice",
+                        "value": data.maintenance_msg.clone().unwrap_or_else(|| "System compliant.".to_string())
                     }
                 ],
                 "footer": {
-                    "text": format!("Method: Hybrid + Clock Sync | Velocity: {:.4}s/slot | Drift: {}s | Detected: {}", data.avg_slot_time, data.drift_seconds, data.current_ver)
+                    "text": format!("Method: Hybrid | Velocity: {:.4}s/slot | Detected: {}", data.avg_slot_time, data.current_ver)
                 }
             }]
         });
 
-        self.client.post(&self.webhook_url).json(&payload).send().await?;
+        self.client
+            .post(&self.webhook_url)
+            .json(&payload)
+            .send()
+            .await?;
         tracing::info!("Discord notification sent successfully");
         Ok(())
     }

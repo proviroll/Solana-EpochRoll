@@ -23,7 +23,14 @@ pub fn is_compliant(current: &str, required: &str) -> bool {
         return false;
     }
 
-    // Compare major.minor.patch
+    // --- Lineage Protection ---
+    // If requirement starts with 0. (Firedancer) but current starts with >= 1 (Agave)
+    // Or vice versa. They are different software and cannot be compared by version number.
+    if curr_parts[0] != req_parts[0] {
+        return false; 
+    }
+
+    // Standard version comparison
     curr_parts >= req_parts
 }
 
