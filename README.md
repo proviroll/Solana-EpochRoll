@@ -30,7 +30,14 @@ Supports simultaneous reporting across enterprise communication platforms. Each 
 *   **Telegram**: Clean Markdown reports with instant mobile delivery.
 *   **Discord**: Professional Embed-based alerting with status-coded colors.
 
-### 4. Compliance & SFDP Tracking
+### 4. Intelligent Maintenance Advisor (New)
+Eliminate the risk of missing leader slots during software upgrades. When non-compliance is detected, the monitor proactively:
+*   **Scans Leader Schedule**: Analyzes upcoming block assignments directly from the RPC.
+*   **Calculates Safe Windows**: Identifies gaps in production (minimum 25 mins) safe for a Frankendancer restart.
+*   **Precise Scheduling**: Provides start times and deadlines in **Universal Coordinated Time (UTC)**.
+*   **Actionable Instructions**: Explicitly recommends whether to "Upgrade Now" or "Wait" based on real-time workload clusters.
+
+### 5. Compliance & SFDP Tracking
 Proactively polls the Solana Foundation API to compare your node's current version against the mandatory minimums for upcoming epochs, flagging potential non-compliance before it impacts your delegation.
 
 ---

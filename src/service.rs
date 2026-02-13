@@ -134,19 +134,11 @@ impl SFDPService {
 
         let now = Utc::now();
 
-        // Clock Drift Sync (Cluster Time vs System Time)
-        let cluster_time = self
-            .client
-            .get_cluster_time()
-            .await
-            .unwrap_or(now.timestamp());
-        let drift_seconds = now.timestamp() - cluster_time;
-
         let slots_left_current = info.slots_in_epoch - info.slot_index;
         let time_left_seconds = (slots_left_current as f64 * avg_slot_time) as i64;
 
-        // Correct ETA
-        let epoch_end_eta = now + Duration::seconds(time_left_seconds - drift_seconds);
+        // Correct ETA: Simple duration addition based on actual slot velocity
+        let epoch_end_eta = now + Duration::seconds(time_left_seconds);
 
         let mode_str = match self.mode {
             ValidatorMode::Agave => "AGAVE",
@@ -224,6 +216,93 @@ impl SFDPService {
             "NON-COMPLIANT"
         };
 
+        // --- Enhanced Maintenance Advisor Logic ---
+        let mut maintenance_msg = None;
+        if !overall_compliant {
+            if let Ok(schedule) = self.client.get_leader_schedule(&self.identity).await {
+                let epoch_start_slot = info.absolute_slot.saturating_sub(info.slot_index);
+                let absolute_schedule: Vec<u64> =
+                    schedule.iter().map(|s| epoch_start_slot + s).collect();
+                let future_blocks: Vec<u64> = absolute_schedule
+                    .iter()
+                    .cloned()
+                    .filter(|s| *s > processed_slot)
+                    .collect();
+
+                if future_blocks.is_empty() {
+                    maintenance_msg = Some("🚨 *ACTION REQUIRED:* Your software is out of date. Since you have no more blocks assigned for this epoch, *UPGRADE IMMEDIATELY* to restore compliance.".to_string());
+                } else {
+                    let next_block = future_blocks[0];
+                    let mins_until_next =
+                        ((next_block - processed_slot) as f64 * avg_slot_time / 60.0) as i64;
+
+                    // Group clusters for display
+                    let mut clusters = Vec::new();
+                    let mut temp = vec![future_blocks[0]];
+                    for i in 1..future_blocks.len() {
+                        if future_blocks[i] == future_blocks[i - 1] + 1 {
+                            temp.push(future_blocks[i]);
+                        } else {
+                            clusters.push(temp);
+                            temp = vec![future_blocks[i]];
+                            if clusters.len() >= 4 {
+                                break;
+                            }
+                        }
+                    }
+                    if clusters.len() < 4 {
+                        clusters.push(temp);
+                    }
+
+                    let mut schedule_text = String::from("\n*Upcoming Workload:*");
+                    for c in &clusters {
+                        let c_start = c[0];
+                        let c_eta_utc = now
+                            + Duration::seconds(
+                                ((c_start - processed_slot) as f64 * avg_slot_time) as i64,
+                            );
+                        schedule_text.push_str(&format!(
+                            "\n• Slot `{}` ({} blocks) at `{}` UTC",
+                            c_start,
+                            c.len(),
+                            c_eta_utc.format("%H:%M")
+                        ));
+                    }
+
+                    if mins_until_next >= 25 {
+                        let deadline_utc = now + Duration::minutes(mins_until_next - 5);
+                        maintenance_msg = Some(format!(
+                            "⚠️ *SOFTWARE UPGRADE RECOMMENDED:* You are currently non-compliant.\n✅ *Instruction:* You have a `{}` minute window. *Safe to upgrade NOW.*\n🚨 *Deadline:* You must be back online and synced by *{} UTC* to avoid missing your next assignment.{}",
+                            mins_until_next,
+                            deadline_utc.format("%H:%M"),
+                            schedule_text
+                        ));
+                    } else {
+                        let cluster_end = clusters[0].last().unwrap();
+                        let next_window_start_utc = now
+                            + Duration::seconds(
+                                ((*cluster_end - processed_slot) as f64 * avg_slot_time) as i64 + 30,
+                            );
+
+                        let next_gap_mins = if clusters.len() > 1 {
+                            let gap_slots = clusters[1][0] - clusters[0].last().unwrap();
+                            (gap_slots as f64 * avg_slot_time / 60.0) as i64
+                        } else {
+                            999
+                        };
+
+                        maintenance_msg = Some(format!(
+                            "⚠️ *SOFTWARE UPGRADE REQUIRED:* You are currently non-compliant.\n⏳ *Instruction:* DO NOT restart yet. Blocks are imminent in `{}` minutes.\n✅ *Best Action:* Wait until your current assignment ends. *Start upgrade at {} UTC.*\n💡 *Note:* The next window will be `{}` minutes long, which is safe for a Frankendancer restart.{}",
+                            mins_until_next,
+                            next_window_start_utc.format("%H:%M"),
+                            next_gap_mins,
+                            schedule_text
+                        ));
+                    }
+                }
+            }
+        }
+
         let mut warning_text = sync_text;
         if !requirements.is_empty()
             && (info.epoch as i64 - requirements[0].epoch as i64).abs() > 100
@@ -252,8 +331,8 @@ impl SFDPService {
             warning_text,
             avg_slot_time,
             current_ver: current_ver.to_string(),
-            drift_seconds,
             table,
+            maintenance_msg,
         };
 
         for provider in &self.notification_providers {
@@ -287,9 +366,9 @@ impl SFDPService {
             info!("Fetching version...");
             let version = self
                 .client
-                .get_version()
+                .get_validator_version(&self.identity)
                 .await
-                .unwrap_or_else(|_| "Error".to_string());
+                .unwrap_or_else(|_| "Unknown".to_string());
 
             info!("Fetching epoch info...");
             let info = self.client.fetch_epoch_info().await?;

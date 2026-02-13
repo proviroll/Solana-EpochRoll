@@ -74,7 +74,7 @@ pub struct ReportData {
     pub avg_slot_time: f64,
     pub current_ver: String,
     pub table: String,
-    pub drift_seconds: i64,
+    pub maintenance_msg: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
